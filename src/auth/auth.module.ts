@@ -7,8 +7,8 @@ import { UserModule } from '@user/user.module';
 import { options } from './config';
 
 @Module({
-  controllers: [AuthController],
-  providers: [AuthService],
-  imports: [PassportModule, JwtModule.registerAsync(options()), UserModule],
+    controllers: [AuthController],
+    providers: [AuthService],
+    imports: [PassportModule, JwtModule.registerAsync(options()), UserModule],
 })
 export class AuthModule {}

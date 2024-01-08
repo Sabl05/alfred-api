@@ -11,95 +11,95 @@ import { add } from 'date-fns';
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-  constructor(
-    private readonly userService: UserService,
-    private readonly jwtService: JwtService,
-    private readonly prismaService: PrismaService,
-  ) {}
+    private readonly logger = new Logger(AuthService.name);
+    constructor(
+        private readonly userService: UserService,
+        private readonly jwtService: JwtService,
+        private readonly prismaService: PrismaService,
+    ) {}
 
-  async refreshTokens(refreshToken: string, agent: string): Promise<Tokens> {
-    const token = await this.prismaService.token.findUnique({ where: { token: refreshToken } });
+    async refreshTokens(refreshToken: string, agent: string): Promise<Tokens> {
+        const token = await this.prismaService.token.findUnique({ where: { token: refreshToken } });
 
-    if (!token) {
-      throw new UnauthorizedException();
+        if (!token) {
+            throw new UnauthorizedException();
+        }
+
+        await this.prismaService.token.delete({ where: { token: refreshToken } });
+
+        if (new Date(token.exp) < new Date()) {
+            throw new UnauthorizedException();
+        }
+
+        const user = await this.userService.findOne(token.userId);
+
+        return this.generateTokens(user, agent);
     }
 
-    await this.prismaService.token.delete({ where: { token: refreshToken } });
+    async register(dto: RegisterDto) {
+        const user: User = await this.userService.findOne(dto.email).catch((err) => {
+            this.logger.error(err);
+            return null;
+        });
 
-    if (new Date(token.exp) < new Date()) {
-      throw new UnauthorizedException();
+        if (user) {
+            throw new ConflictException('Пользыватель уже существует');
+        }
+
+        return this.userService.save(dto).catch((err) => {
+            this.logger.error(err);
+            return null;
+        });
     }
 
-    const user = await this.userService.findOne(token.userId);
+    async login(dto: LoginDto, agent: string): Promise<Tokens> {
+        const user: User = await this.userService.findOne(dto.email).catch((err) => {
+            this.logger.error(err);
+            return null;
+        });
 
-    return this.generateTokens(user, agent);
-  }
+        if (!user || !compareSync(dto.password, user.password)) {
+            throw new UnauthorizedException('Не верный логин или пароль');
+        }
 
-  async register(dto: RegisterDto) {
-    const user: User = await this.userService.findOne(dto.email).catch((err) => {
-      this.logger.error(err);
-      return null;
-    });
-
-    if (user) {
-      throw new ConflictException('Пользыватель уже существует');
+        return this.generateTokens(user, agent);
     }
 
-    return this.userService.save(dto).catch((err) => {
-      this.logger.error(err);
-      return null;
-    });
-  }
+    async generateTokens(user: User, agent: string): Promise<Tokens> {
+        const accessToken =
+            'Bearer ' +
+            this.jwtService.sign({
+                id: user.id,
+                email: user.email,
+                roles: user.roles,
+            });
 
-  async login(dto: LoginDto, agent: string): Promise<Tokens> {
-    const user: User = await this.userService.findOne(dto.email).catch((err) => {
-      this.logger.error(err);
-      return null;
-    });
+        const refreshToken = await this.getRefreshToken(user.id, agent);
 
-    if (!user || !compareSync(dto.password, user.password)) {
-      throw new UnauthorizedException('Не верный логин или пароль');
+        return { accessToken, refreshToken };
     }
 
-    return this.generateTokens(user, agent);
-  }
+    async getRefreshToken(userId: string, agent: string): Promise<Token> {
+        const _token = await this.prismaService.token.findFirst({
+            where: {
+                userId,
+                userAgent: agent,
+            },
+        });
+        const token = _token?.token ?? '';
 
-  async generateTokens(user: User, agent: string): Promise<Tokens> {
-    const accessToken =
-      'Bearer ' +
-      this.jwtService.sign({
-        id: user.id,
-        email: user.email,
-        roles: user.roles,
-      });
-
-    const refreshToken = await this.getRefreshToken(user.id, agent);
-
-    return { accessToken, refreshToken };
-  }
-
-  async getRefreshToken(userId: string, agent: string): Promise<Token> {
-    const _token = await this.prismaService.token.findFirst({
-      where: {
-        userId,
-        userAgent: agent,
-      },
-    });
-    const token = _token?.token ?? '';
-
-    return this.prismaService.token.upsert({
-      where: { token },
-      update: {
-        token: v4(),
-        exp: add(new Date(), { months: 1 }),
-      },
-      create: {
-        token: v4(),
-        exp: add(new Date(), { months: 1 }),
-        userId,
-        userAgent: agent,
-      },
-    });
-  }
+        return this.prismaService.token.upsert({
+            where: { token },
+            update: {
+                token: v4(),
+                exp: add(new Date(), { months: 1 }),
+            },
+            create: {
+                token: v4(),
+                exp: add(new Date(), { months: 1 }),
+                userId,
+                userAgent: agent,
+            },
+        });
+    }
 }
