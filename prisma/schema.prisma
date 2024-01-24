@@ -8,22 +8,24 @@ datasource db {
 }
 
 model User {
-  id String @id @default(uuid())
-  email String @unique
-  password String
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  roles Role[]
-  Token Token[]
+  roles     Role[]
+  Token     Token[]
+
   @@map("users")
 }
 
 model Token {
-  token String @unique
-  exp DateTime
-  user User @relation(fields: [userId], references: [id])
-  userId String  @map("user_id")
-  userAgent String @map("user_agent")
+  token     String   @unique
+  exp       DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  userAgent String   @map("user_agent")
+
   @@map("tokens")
 }
 
