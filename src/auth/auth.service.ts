@@ -20,11 +20,9 @@ export class AuthService {
 
     async refreshTokens(refreshToken: string, agent: string): Promise<Tokens> {
         const token = await this.prismaService.token.findUnique({ where: { token: refreshToken } });
-
         if (!token) {
             throw new UnauthorizedException();
         }
-
         await this.prismaService.token.delete({ where: { token: refreshToken } });
 
         if (new Date(token.exp) < new Date()) {
@@ -32,7 +30,6 @@ export class AuthService {
         }
 
         const user = await this.userService.findOne(token.userId);
-
         return this.generateTokens(user, agent);
     }
 
@@ -45,7 +42,6 @@ export class AuthService {
         if (user) {
             throw new ConflictException('Пользыватель уже существует');
         }
-
         return this.userService.save(dto).catch((err) => {
             this.logger.error(err);
             return null;
@@ -53,15 +49,13 @@ export class AuthService {
     }
 
     async login(dto: LoginDto, agent: string): Promise<Tokens> {
-        const user: User = await this.userService.findOne(dto.email).catch((err) => {
+        const user: User = await this.userService.findOne(dto.email, true).catch((err) => {
             this.logger.error(err);
             return null;
         });
-
         if (!user || !compareSync(dto.password, user.password)) {
             throw new UnauthorizedException('Не верный логин или пароль');
         }
-
         return this.generateTokens(user, agent);
     }
 
@@ -73,9 +67,7 @@ export class AuthService {
                 email: user.email,
                 roles: user.roles,
             });
-
         const refreshToken = await this.getRefreshToken(user.id, agent);
-
         return { accessToken, refreshToken };
     }
 
@@ -87,7 +79,6 @@ export class AuthService {
             },
         });
         const token = _token?.token ?? '';
-
         return this.prismaService.token.upsert({
             where: { token },
             update: {
