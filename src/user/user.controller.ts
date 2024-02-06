@@ -9,7 +9,7 @@ import {
     UseInterceptors,
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { UserResponse } from './reponses';
+import { UserResponse } from './responses';
 import { CurrentUser, Roles } from '@common/decorators';
 import { JwtPayload } from '@auth/interfaces';
 import { RolesGuard } from '@auth/guards/role.guard';
